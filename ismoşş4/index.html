@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body {
+            background: linear-gradient(to right, red, white);
+            margin: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+            color: white;
+        }
+
+        #image-container {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            border-radius: 10px;
+            display: none;
+            cursor: grab;
+            user-select: none;
+        }
+
+        #controls {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        button {
+            margin: 0 10px;
+            padding: 10px;
+            border: none;
+            border-radius: 50%;
+            background-color: black;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        #drop-area {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            text-align: center;
+            opacity: 0.7;
+        }
+
+        #upload-btn-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 20px;
+        }
+
+        #upload-btn-wrapper input[type=file] {
+            font-size: 100px;
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0;
+        }
+
+        #upload-btn-wrapper i {
+            padding: 10px;
+            background: black;
+            color: white;
+            border-radius: 50%;
+            font-size: 18px;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+
+        #search-box-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            align-items: center;
+        }
+
+        #search-btn {
+            background-color: transparent;
+            border: none;
+            cursor: pointer;
+            outline: none;
+            margin-left: 10px;
+        }
+
+        #search-btn i {
+            font-size: 18px;
+        }
+
+        #search-input {
+            display: none;
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            margin-left: 5px;
+            outline: none;
+            width: 0;
+            transition: width 0.3s ease-in-out;
+        }
+
+        #image-list {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1;
+            display: none;
+            text-align: center;
+        }
+
+        #image-list img {
+            width: 150px;
+            height: 150px;
+            margin: 5px;
+            border-radius: 10px;
+            cursor: pointer;
+        }
+    </style>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const dropArea = document.getElementById("drop-area");
+            const imageContainer = document.getElementById("image-container");
+            const searchBtn = document.getElementById("search-btn");
+            const searchInput = document.getElementById("search-input");
+            const imageList = document.getElementById("image-list");
+
+            dropArea.addEventListener("dragover", function (e) {
+                e.preventDefault();
+            });
+
+            dropArea.addEventListener("drop", function (e) {
+                e.preventDefault();
+
+                const file = e.dataTransfer.files[0];
+                displayImage(file);
+            });
+
+            document.getElementById("upload-btn-wrapper").addEventListener("change", function (e) {
+                const file = e.target.files[0];
+                displayImage(file);
+            });
+
+            document.getElementById("close").addEventListener("click", function () {
+                closeImage();
+            });
+
+            document.getElementById("remove").addEventListener("click", function () {
+                removeImage();
+            });
+
+            searchBtn.addEventListener("click", function () {
+                toggleSearchInput();
+            });
+
+            searchInput.addEventListener("keyup", function (event) {
+                if (event.key === "Enter") {
+                    searchImages();
+                }
+            });
+
+            // Kontroller
+            const controls = document.getElementById("controls");
+
+            document.getElementById("zoom-in").addEventListener("click", function () {
+                imageContainer.style.transform = `scale(${parseFloat(getComputedStyle(imageContainer).transform.split(',')[0].slice(7)) + 0.1})`;
+            });
+
+            document.getElementById("zoom-out").addEventListener("click", function () {
+                imageContainer.style.transform = `scale(${parseFloat(getComputedStyle(imageContainer).transform.split(',')[0].slice(7)) - 0.1})`;
+            });
+
+            document.getElementById("original-size").addEventListener("click", function () {
+                imageContainer.style.transform = 'scale(1)';
+            });
+
+            document.getElementById("save").addEventListener("click", function () {
+                const currentDate = new Date();
+                const fileName = `image_${currentDate.getFullYear()}${currentDate.getMonth() + 1}${currentDate.getDate()}_${currentDate.getHours()}${currentDate.getMinutes()}${currentDate.getSeconds()}.png`;
+
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                const img = document.querySelector('#image-container img');
+
+                canvas.width = img.width;
+                canvas.height = img.height;
+                ctx.drawImage(img, 0, 0, img.width, img.height);
+
+                const link = document.createElement('a');
+                link.href = canvas.toDataURL('image/png');
+                link.download = fileName;
+                link.click();
+            });
+
+            let isDragging = false;
+            let offsetX, offsetY;
+
+            imageContainer.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                offsetX = e.clientX - parseFloat(getComputedStyle(imageContainer).left);
+                offsetY = e.clientY - parseFloat(getComputedStyle(imageContainer).top);
+                imageContainer.style.cursor = 'grabbing';
+            });
+
+            imageContainer.addEventListener('mouseup', () => {
+                isDragging = false;
+                imageContainer.style.cursor = 'grab';
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if (isDragging) {
+                    const x = e.clientX - offsetX;
+                    const y = e.clientY - offsetY;
+
+                    imageContainer.style.left = `${x}px`;
+                    imageContainer.style.top = `${y}px`;
+                }
+            });
+
+            document.getElementById("zoom-in").addEventListener("wheel", function (e) {
+                e.preventDefault();
+                imageContainer.style.transform = `scale(${parseFloat(getComputedStyle(imageContainer).transform.split(',')[0].slice(7)) + 0.05})`;
+            });
+
+            document.getElementById("zoom-out").addEventListener("wheel", function (e) {
+                e.preventDefault();
+                imageContainer.style.transform = `scale(${parseFloat(getComputedStyle(imageContainer).transform.split(',')[0].slice(7)) - 0.05})`;
+            });
+
+            function displayImage(file) {
+                const reader = new FileReader();
+
+                reader.onload = function (event) {
+                    const img = new Image();
+                    img.src = event.target.result;
+
+                    // Resmi ekranda göster
+                    imageContainer.innerHTML = ''; // İlgili konteynırı temizle
+                    imageContainer.appendChild(img);
+
+                    // İlgili stil ayarları
+                    img.style.width = '100%';
+                    img.style.height = '100%';
+                    imageContainer.style.display = "block";
+                    imageContainer.style.transform = 'translate(-50%, -50%)'; // Ekranın ortasına getir
+                };
+
+                reader.readAsDataURL(file);
+            }
+
+            function closeImage() {
+                imageContainer.style.display = "none";
+            }
+
+            function removeImage() {
+                closeImage();
+                dropArea.innerHTML = '<div id="upload-btn-wrapper"><button class="btn">Resmi Seç</button><input type="file" name="myfile" /><i class="fa fa-arrow-up"></i></div><p>veya</p><p>Resmi buraya sürükleyin</p>';
+            }
+
+            function toggleSearchInput() {
+                if (searchInput.style.width === "0px") {
+                    searchInput.style.width = "150px";
+                    searchInput.style.display = "block";
+                    searchInput.focus();
+                } else {
+                    searchInput.style.width = "0";
+                    searchInput.style.display = "none";
+                }
+            }
+
+            function searchImages() {
+                // Örnek resimlerin boyutları 150x150 olarak güncellendi
+                imageList.innerHTML = `
+                    <img src="https://via.placeholder.com/150x150" alt="Image 1">
+                    <img src="https://via.placeholder.com/150x150" alt="Image 2">
+                    <img src="https://via.placeholder.com/150x150" alt="Image 3">
+                `;
+                imageList.style.display = "block";
+            }
+
+            // Resim listesinden bir resme tıklandığında
+            imageList.addEventListener("click", function (event) {
+                if (event.target.tagName === "IMG") {
+                    const selectedSrc = event.target.src;
+                    displayImageFromList(selectedSrc);
+                    imageList.style.display = "none";
+                }
+            });
+
+            // Resim listesinden seçilen resmi ekranda gösterir
+            function displayImageFromList(src) {
+                const img = new Image();
+                img.src = src;
+
+                imageContainer.innerHTML = '';
+                imageContainer.appendChild(img);
+
+                img.style.width = '100%';
+                img.style.height = '100%';
+                imageContainer.style.display = "block";
+                imageContainer.style.transform = 'translate(-50%, -50%)';
+            }
+        });
+    </script>
+</head>
+<body>
+    <div id="drop-area">
+        <div id="upload-btn-wrapper">
+            <button class="btn">Resmi Seç</button>
+            <input type="file" name="myfile" />
+            <i class="fa fa-arrow-up"></i>
+        </div>
+        <p>veya</p>
+        <p>Resmi buraya sürükleyin</p>
+    </div>
+    <div id="controls">
+        <button id="zoom-in">➕</button>
+        <button id="zoom-out">➖</button>
+        <button id="original-size">⭕</button>
+        <button id="save"> 💾</button>
+        <button id="remove">✖</button>
+    </div>
+    <div id="search-box-container">
+        <button id="search-btn"><i class="fa fa-search"></i></button>
+        <input type="text" id="search-input" placeholder="Resim URL'sini yapıştır" />
+    </div>
+    <div id="image-list"></div>
+    <div id="image-container">
+        <button id="close" style="position: absolute; top: 10px; right: 10px;">X</button>
+    </div>
+	
+</body>
+<link rel="manifest" href="/manifest.json">
+</body>
+</html>
